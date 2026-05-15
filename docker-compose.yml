@@ -36,8 +36,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - cytunes-pgdata:/var/lib/postgresql/data
-      # schema.sql runs automatically on first boot (when pgdata is empty)
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      # Schema is NOT mounted here — the web container applies db/schema.sql
+      # idempotently on startup (see src/lib/migrate.ts). That way the compose
+      # file is self-contained and works when pasted into the ZimaOS UI.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s

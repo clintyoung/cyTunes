@@ -1,5 +1,6 @@
 import { Pool, PoolClient } from "pg";
 import { env } from "@/lib/env";
+import { ensureMigrated } from "@/lib/migrate";
 
 // Single shared pool. Next.js can hot-reload modules in dev, so we cache
 // the pool on globalThis to avoid leaking connections.
@@ -25,11 +26,13 @@ export async function query<T = unknown>(
   text: string,
   params?: unknown[]
 ): Promise<{ rows: T[]; rowCount: number }> {
+  await ensureMigrated(pool); // one-time per process; near-zero overhead after first call
   const result = await pool.query(text, params as never);
   return { rows: result.rows as T[], rowCount: result.rowCount ?? 0 };
 }
 
 export async function withClient<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+  await ensureMigrated(pool);
   const client = await pool.connect();
   try {
     return await fn(client);
