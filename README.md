@@ -47,7 +47,10 @@ A spin instructor's music player. Streams from your Spotify Premium account, but
 2. Paste the contents of `docker-compose.yml` from this repo.
 3. ZimaOS will ask for environment variables — fill them in using `.env.example` as a guide.
 4. Click deploy.
-5. On first boot, Postgres runs `db/schema.sql` automatically.
+5. On first boot, the web container applies `db/schema.sql` to Postgres
+   automatically (see `src/lib/migrate.ts`). The schema uses
+   `CREATE ... IF NOT EXISTS` everywhere, so it's safe to re-run on every
+   container restart.
 
 ### 3. Verify
 
