@@ -15,10 +15,10 @@ async function loadPlaylist(userId: string, playlistId: string) {
   const meta = (await metaRes.json()) as {
     id: string;
     name: string;
-    description: string;
-    images: { url: string }[];
-    owner: { display_name: string };
-    tracks: { total: number };
+    description: string | null;
+    images: { url: string }[] | null;
+    owner: { display_name: string | null } | null;
+    tracks: { total: number } | null;
   };
 
   // 2) Tracks
@@ -40,16 +40,17 @@ async function loadPlaylist(userId: string, playlistId: string) {
     if (!res.ok) break;
     const data = (await res.json()) as { items: RawItem[]; next: string | null };
     for (const item of data.items) {
-      if (!item.track) continue;
+      const t = item?.track;
+      if (!t || typeof t.id !== "string") continue;
       tracks.push({
-        id: item.track.id,
-        uri: item.track.uri,
-        name: item.track.name,
-        duration_ms: item.track.duration_ms,
-        isrc: item.track.external_ids?.isrc ?? null,
-        album_name: item.track.album.name,
-        album_image: item.track.album.images[0]?.url ?? null,
-        artists: item.track.artists.map((a) => a.name).join(", "),
+        id: t.id,
+        uri: t.uri,
+        name: t.name ?? "Untitled",
+        duration_ms: t.duration_ms ?? 0,
+        isrc: t.external_ids?.isrc ?? null,
+        album_name: t.album?.name ?? "",
+        album_image: t.album?.images?.[0]?.url ?? null,
+        artists: (t.artists ?? []).map((a) => a?.name ?? "").filter(Boolean).join(", "),
       });
     }
     next = data.next;
@@ -119,7 +120,7 @@ export default async function PlaylistDetailPage({ params }: { params: Params })
 
   return (
     <>
-      <TopBar back="/playlists" title={meta.name} />
+      <TopBar back="/playlists" title={meta.name || "Playlist"} />
       <main className="main">
         <PlaylistView playlistId={id} tracks={annotated} initialTrims={trims} />
       </main>
