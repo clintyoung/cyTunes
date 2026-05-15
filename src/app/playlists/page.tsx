@@ -13,21 +13,37 @@ type SpotifyPlaylist = {
   tracks: { total: number } | null;
 };
 
+const DEBUG = process.env.DEBUG_AUTH === "1";
+
 async function fetchAllPlaylists(userId: string): Promise<SpotifyPlaylist[]> {
   const items: SpotifyPlaylist[] = [];
   let next: string | null = "/me/playlists?limit=50";
+  let pageIdx = 0;
   while (next) {
     const res = await spotifyFetch(userId, next);
-    if (!res.ok) break;
+    if (!res.ok) {
+      // eslint-disable-next-line no-console
+      console.warn(`[playlists] page ${pageIdx} fetch failed: ${res.status}`);
+      break;
+    }
     const data = (await res.json()) as {
       items: (SpotifyPlaylist | null)[];
       next: string | null;
     };
+    // One-time dump of the first non-null playlist's shape so we can see
+    // exactly what Spotify is returning — particularly whether `tracks`
+    // is present, has a total, or has a different shape than expected.
+    if (DEBUG && pageIdx === 0) {
+      const sample = data.items.find((p) => p !== null);
+      // eslint-disable-next-line no-console
+      console.log("[playlists] first item raw:", JSON.stringify(sample, null, 2));
+    }
     // Filter out null entries Spotify occasionally returns
     for (const p of data.items) {
       if (p && typeof p.id === "string") items.push(p);
     }
     next = data.next;
+    pageIdx += 1;
   }
   return items;
 }
