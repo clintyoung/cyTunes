@@ -1,0 +1,64 @@
+# cyTunes — paste this into ZimaOS "Install a custom app" UI.
+# Then fill out .env from .env.example before deploying.
+
+services:
+  web:
+    image: ghcr.io/clintyoung/cytunes:latest
+    container_name: cytunes-web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT}
+      APP_URL: ${APP_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
+      DATABASE_URL: ${DATABASE_URL}
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+      SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI}
+      GETSONGBPM_API_KEY: ${GETSONGBPM_API_KEY}
+    ports:
+      # Host port 4444 → container port 3000.
+      # 4444 is for LAN debugging; Cloudflare Tunnel reaches the container directly via the compose network.
+      - "4444:3000"
+    networks:
+      - cytunes
+
+  db:
+    image: postgres:16-alpine
+    container_name: cytunes-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - cytunes-pgdata:/var/lib/postgresql/data
+      # schema.sql runs automatically on first boot (when pgdata is empty)
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cytunes
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cytunes-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARED_TUNNEL_TOKEN}
+    depends_on:
+      - web
+    networks:
+      - cytunes
+
+volumes:
+  cytunes-pgdata:
+
+networks:
+  cytunes:
+    driver: bridge
