@@ -1,9 +1,17 @@
 // Centralized env access with required-vs-optional discipline.
 // Throws at module load if anything required is missing — fail fast.
 
+// During `next build`, the "collect page data" pass loads each route's
+// module to inspect exports. That triggers module-level env reads. The real
+// env isn't available in the build container — only at deploy time. We
+// short-circuit with a placeholder here so the build can proceed; runtime
+// reads (real requests) still validate normally.
+const IS_BUILD = process.env.NEXT_PHASE === "phase-production-build";
+
 function required(name: string): string {
   const v = process.env[name];
   if (!v || v.length === 0) {
+    if (IS_BUILD) return `BUILD_TIME_PLACEHOLDER_${name}`;
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return v;
