@@ -3,11 +3,14 @@ import { requireUser } from "@/lib/auth";
 import { spotifyFetch } from "@/lib/spotify";
 import { TopBar } from "@/components/TopBar";
 
+// Spotify can return playlists where individual fields are null or missing
+// (auto-generated mixes, deleted-but-cached items, etc.), so every nested
+// field is optional here and we render defensively below.
 type SpotifyPlaylist = {
   id: string;
   name: string;
-  images: { url: string }[];
-  tracks: { total: number };
+  images: { url: string }[] | null;
+  tracks: { total: number } | null;
 };
 
 async function fetchAllPlaylists(userId: string): Promise<SpotifyPlaylist[]> {
@@ -16,8 +19,14 @@ async function fetchAllPlaylists(userId: string): Promise<SpotifyPlaylist[]> {
   while (next) {
     const res = await spotifyFetch(userId, next);
     if (!res.ok) break;
-    const data = (await res.json()) as { items: SpotifyPlaylist[]; next: string | null };
-    items.push(...data.items);
+    const data = (await res.json()) as {
+      items: (SpotifyPlaylist | null)[];
+      next: string | null;
+    };
+    // Filter out null entries Spotify occasionally returns
+    for (const p of data.items) {
+      if (p && typeof p.id === "string") items.push(p);
+    }
     next = data.next;
   }
   return items;
@@ -45,8 +54,10 @@ export default async function PlaylistsPage() {
                 className="playlist-cover"
               />
               <div className="playlist-meta">
-                <div className="playlist-name">{p.name}</div>
-                <div className="playlist-count">{p.tracks.total} tracks</div>
+                <div className="playlist-name">{p.name || "Untitled"}</div>
+                <div className="playlist-count">
+                  {p.tracks?.total ?? 0} tracks
+                </div>
               </div>
             </Link>
           ))}
